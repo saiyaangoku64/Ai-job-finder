@@ -1,0 +1,8 @@
+{
+  "name": "StudentJobs",
+  "description": "An advanced, AI-powered job search engine specifically designed for students finding part-time work. Features live job search across major platforms, resume analysis, scam detection, and study-work balance planning.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": []
+}
