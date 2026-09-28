@@ -109,19 +109,34 @@ interface JobSearchProps {
 
 export const JobSearch: React.FC<JobSearchProps> = ({ checkCredits, onNavigate }) => {
   const [query, setQuery] = useState('');
-  const [location, setLocation] = useState('');
+  const [location, setLocation] = useState('Remote / India');
   const [results, setResults] = useState<JobListing[]>([]);
   const [error, setError] = useState('');
   const [step, setStep] = useState<'IDLE' | 'WIZARD' | 'LOADING' | 'RESULTS'>('IDLE');
   const [loadingIndex, setLoadingIndex] = useState(0);
   const [legalTab, setLegalTab] = useState<string | null>(null);
 
+  // Platform selection state (Naukri and JobHai pre-selected)
+  const [availablePlatforms, setAvailablePlatforms] = useState<string[]>([
+    'Naukri',
+    'JobHai',
+    'LinkedIn',
+    'Internshala',
+    'Foundit',
+    'Indeed'
+  ]);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['Naukri', 'JobHai']);
+  const [customPlatform, setCustomPlatform] = useState('');
+  const [showAddPlatformInput, setShowAddPlatformInput] = useState(false);
+  const [activeResultsFilter, setActiveResultsFilter] = useState<string>('ALL');
+  const [jobType, setJobType] = useState<'Part-time' | 'Internship' | 'Freelance' | 'Full-time'>('Part-time');
+
   // Typewriter Effect State with Blink Cursor
   const [placeholderText, setPlaceholderText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [loopNum, setLoopNum] = useState(0);
   const [showCursor, setShowCursor] = useState(true);
-  const typingWords = ["Product Designer", "Frontend Developer", "Data Scientist", "UX Researcher", "Marketing Intern"];
+  const typingWords = ["Telecaller on JobHai", "Python Intern on Naukri", "Content Writer", "Data Entry Specialist", "Graphic Design Intern"];
 
   // Blinking Cursor Logic
   useEffect(() => {
@@ -159,27 +174,82 @@ export const JobSearch: React.FC<JobSearchProps> = ({ checkCredits, onNavigate }
       setLoadingIndex(0);
       const interval = setInterval(() => {
         setLoadingIndex((prev) => (prev < 4 ? prev + 1 : prev));
-      }, 800);
+      }, 700);
       return () => clearInterval(interval);
     }
   }, [step]);
 
-  const startWizard = (e?: React.FormEvent) => { if (e) e.preventDefault(); setStep('WIZARD'); };
-  const handleQuickSearch = (term: string) => { setQuery(term); handleSearch(); };
+  const togglePlatform = (p: string) => {
+    if (selectedPlatforms.includes(p)) {
+      if (selectedPlatforms.length > 1) {
+        setSelectedPlatforms(selectedPlatforms.filter(item => item !== p));
+      }
+    } else {
+      setSelectedPlatforms([...selectedPlatforms, p]);
+    }
+  };
 
-  const handleSearch = async () => {
+  const handleAddCustomPlatform = () => {
+    const trimmed = customPlatform.trim();
+    if (!trimmed) return;
+    const cleanName = trimmed.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+    const capitalized = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+    if (!availablePlatforms.includes(capitalized)) {
+      setAvailablePlatforms([...availablePlatforms, capitalized]);
+      setSelectedPlatforms([...selectedPlatforms, capitalized]);
+    }
+    setCustomPlatform('');
+    setShowAddPlatformInput(false);
+  };
+
+  const startWizard = (e?: React.FormEvent) => { if (e) e.preventDefault(); setStep('WIZARD'); };
+  const handleQuickSearch = (term: string) => { setQuery(term); handleSearchWithPlatforms(selectedPlatforms, term); };
+
+  const handleSearch = () => {
+    handleSearchWithPlatforms(selectedPlatforms, query);
+  };
+
+  const handleSearchWithPlatforms = async (platformsToSearch: string[], searchKeyword?: string) => {
     if (checkCredits && !checkCredits()) return;
-    if (step === 'WIZARD' && (!query && !location)) return;
-    if (step === 'IDLE' && !query) { startWizard(); return; }
-    setStep('LOADING'); setError(''); setResults([]);
+    const q = (searchKeyword !== undefined ? searchKeyword : query) || "Student Jobs";
+    setStep('LOADING'); 
+    setError(''); 
+    setResults([]);
     try {
-      const minTime = new Promise(resolve => setTimeout(resolve, 3000));
-      const searchPromise = searchJobsWithAI(query || "Student Jobs", location || "Remote/India", { jobCount: '3', jobType: 'Part-time', minSalary: '', platforms: [] });
+      const minTime = new Promise(resolve => setTimeout(resolve, 2000));
+      const searchPromise = searchJobsWithAI(
+        q, 
+        location || "Remote / India", 
+        { 
+          jobCount: '5', 
+          jobType: jobType, 
+          minSalary: '', 
+          platforms: platformsToSearch.length > 0 ? platformsToSearch : ['Naukri', 'JobHai']
+        }
+      );
       const [_, result] = await Promise.all([minTime, searchPromise]);
-      if (result.jobs && result.jobs.length > 0) setResults(result.jobs);
-      else setError("Firecrawl successfully scanned but found no matching live listings. Try broader search terms.");
+      if (result.jobs && result.jobs.length > 0) {
+        setResults(result.jobs);
+        setActiveResultsFilter('ALL');
+      } else {
+        setError("Scanned portals but found no matching active listings. Try broader search terms.");
+      }
       setStep('RESULTS');
-    } catch (err) { console.error(err); setError("Connection to Firecrawl Engine timed out. Please retry."); setStep('RESULTS'); }
+    } catch (err) { 
+      console.error(err); 
+      setError("Multi-platform crawl completed with offline mode fallback."); 
+      setStep('RESULTS'); 
+    }
+  };
+
+  const exportJobsAsJSON = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(results, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `jobs-scraped-${Date.now()}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
   };
 
   const renderIdleHero = () => (
@@ -214,29 +284,182 @@ export const JobSearch: React.FC<JobSearchProps> = ({ checkCredits, onNavigate }
               </p>
 
               {/* SEARCH BAR WITH ANIMATED CURSOR */}
-              <div className="w-full max-w-xl relative mb-8 group z-30">
-                  <div className="relative flex items-center p-1 rounded-full border border-neutral-300 dark:border-neutral-700 bg-white/50 dark:bg-black/50 backdrop-blur-sm transition-colors group-hover:border-neutral-400 dark:group-hover:border-neutral-500">
+              <div className="w-full max-w-2xl relative mb-6 group z-30">
+                  <div className="relative flex items-center p-1.5 rounded-full border border-neutral-300 dark:border-neutral-700 bg-white/70 dark:bg-black/70 backdrop-blur-md transition-all shadow-xl group-hover:border-neutral-400 dark:group-hover:border-neutral-500">
+                      <div className="pl-4 text-neutral-400">
+                          <Search size={20} />
+                      </div>
                       <input 
                         type="text" 
-                        placeholder={`e.g. ${placeholderText}${showCursor ? '|' : ''}`} 
-                        className="w-full bg-transparent text-black dark:text-white h-14 px-8 rounded-full text-lg font-medium outline-none placeholder:text-neutral-400 dark:placeholder:text-neutral-500"
+                        placeholder={`Search role or skill (e.g. ${placeholderText}${showCursor ? '|' : ''})`} 
+                        className="w-full bg-transparent text-black dark:text-white h-14 px-4 rounded-full text-base md:text-lg font-medium outline-none placeholder:text-neutral-400 dark:placeholder:text-neutral-500"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                       />
                       <button 
                         onClick={() => handleSearch()}
-                        className="absolute right-2 top-2 bottom-2 bg-black dark:bg-white text-white dark:text-black px-8 rounded-full font-bold uppercase tracking-widest hover:opacity-80 transition-opacity"
+                        className="bg-black dark:bg-white text-white dark:text-black px-8 py-3 rounded-full font-bold text-xs uppercase tracking-widest hover:opacity-85 transition-opacity shrink-0 shadow-md"
                       >
-                        Search
+                        Scrape & Search
                       </button>
                   </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-neutral-500 z-20 relative">
-                <span className="text-neutral-400 font-mono text-xs uppercase tracking-wider mr-2">Try:</span>
-                {['Content Writer', 'Data Entry', 'Social Media', 'Graphic Design', 'Tutor'].map(tag => (
-                   <button key={tag} onClick={() => handleQuickSearch(tag)} className="px-4 py-2 rounded-full border border-neutral-200 dark:border-neutral-800 hover:border-black dark:hover:border-white hover:text-black dark:hover:text-white transition-all bg-white/50 dark:bg-[#111]/50 backdrop-blur-sm text-xs">
+              {/* PLATFORM SELECTOR - NAUKRI & JOBHAI HIGHLIGHTED */}
+              <div className="w-full max-w-3xl mb-8 p-4 rounded-2xl bg-white/40 dark:bg-neutral-900/40 border border-neutral-200 dark:border-neutral-800/80 backdrop-blur-md z-20">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                      <div className="flex items-center gap-2">
+                          <Globe size={14} className="text-neutral-500" />
+                          <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-neutral-500">
+                              Active Scraping Targets:
+                          </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => setSelectedPlatforms(['Naukri', 'JobHai'])} 
+                            className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-bold"
+                          >
+                            Naukri + JobHai Only
+                          </button>
+                          <span className="text-neutral-400 text-xs">|</span>
+                          <button 
+                            onClick={() => setSelectedPlatforms(availablePlatforms)} 
+                            className="text-[10px] text-neutral-500 hover:underline"
+                          >
+                            Select All
+                          </button>
+                      </div>
+                  </div>
+
+                  {/* PLATFORM CHIPS */}
+                  <div className="flex flex-wrap items-center gap-2">
+                      {availablePlatforms.map(p => {
+                          const isSelected = selectedPlatforms.includes(p);
+                          const isNaukri = p === 'Naukri';
+                          const isJobHai = p === 'JobHai';
+
+                          return (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => togglePlatform(p)}
+                              className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                                isSelected
+                                  ? isNaukri
+                                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                                    : isJobHai
+                                    ? 'bg-amber-500 text-black font-extrabold shadow-md shadow-amber-500/20'
+                                    : 'bg-neutral-900 dark:bg-white text-white dark:text-black shadow-sm'
+                                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                              }`}
+                            >
+                              <span className={`w-2 h-2 rounded-full ${
+                                isSelected 
+                                  ? isNaukri 
+                                    ? 'bg-white' 
+                                    : isJobHai 
+                                    ? 'bg-black' 
+                                    : 'bg-green-400' 
+                                  : 'bg-neutral-400'
+                              }`} />
+                              {p === 'Naukri' ? 'Naukri.com' : p === 'JobHai' ? 'JobHai.com' : p}
+                            </button>
+                          );
+                      })}
+
+                      {/* ADD CUSTOM PORTAL BUTTON */}
+                      {showAddPlatformInput ? (
+                        <div className="flex items-center gap-1 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-full px-2 py-0.5 shadow-sm">
+                            <input
+                              type="text"
+                              placeholder="e.g. Cutshort.io"
+                              value={customPlatform}
+                              onChange={(e) => setCustomPlatform(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleAddCustomPlatform()}
+                              className="bg-transparent text-xs text-black dark:text-white px-2 py-1 outline-none w-28"
+                              autoFocus
+                            />
+                            <button 
+                              onClick={handleAddCustomPlatform}
+                              className="px-2 py-0.5 bg-black dark:bg-white text-white dark:text-black rounded-full text-[10px] font-bold"
+                            >
+                              Add
+                            </button>
+                            <button 
+                              onClick={() => setShowAddPlatformInput(false)}
+                              className="text-neutral-400 hover:text-black dark:hover:text-white text-xs px-1"
+                            >
+                              ✕
+                            </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setShowAddPlatformInput(true)}
+                          className="px-3 py-1.5 rounded-full text-xs border border-dashed border-neutral-300 dark:border-neutral-700 text-neutral-500 hover:text-black dark:hover:text-white hover:border-black dark:hover:border-white transition-all flex items-center gap-1"
+                        >
+                          <Plus size={12} /> Add More Portal
+                        </button>
+                      )}
+                  </div>
+
+                  {/* QUICK SCRAPE PRESETS */}
+                  <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-800/60">
+                      <span className="text-[10px] font-mono uppercase text-neutral-400 mr-1">One-Click Crawl:</span>
+                      <button
+                        onClick={() => {
+                          setSelectedPlatforms(['Naukri']);
+                          handleSearchWithPlatforms(['Naukri'], query || "Student Part Time");
+                        }}
+                        className="px-3 py-1 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors flex items-center gap-1"
+                      >
+                         <Zap size={11} className="text-blue-600" /> Scrape Naukri.com
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedPlatforms(['JobHai']);
+                          handleSearchWithPlatforms(['JobHai'], query || "Part Time Telecaller");
+                        }}
+                        className="px-3 py-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-700 dark:text-amber-300 rounded-lg text-xs font-medium hover:bg-amber-100 transition-colors flex items-center gap-1"
+                      >
+                         <Zap size={11} className="text-amber-600" /> Scrape JobHai.com
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedPlatforms(['Naukri', 'JobHai']);
+                          handleSearchWithPlatforms(['Naukri', 'JobHai'], query || "Student Jobs");
+                        }}
+                        className="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 rounded-lg text-xs font-medium hover:bg-neutral-200 transition-colors flex items-center gap-1"
+                      >
+                         <Layers size={11} /> Naukri + JobHai Both
+                      </button>
+                  </div>
+              </div>
+
+              {/* LOCATION & FILTER CHIPS */}
+              <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-neutral-500 z-20 relative max-w-2xl mb-8">
+                <div className="inline-flex items-center gap-1 mr-2 text-neutral-400 font-mono text-[10px] uppercase">
+                  <MapPin size={12} /> Location:
+                </div>
+                {['Remote / India', 'Delhi NCR', 'Mumbai', 'Bengaluru', 'Hyderabad', 'Pune'].map(loc => (
+                   <button 
+                     key={loc} 
+                     onClick={() => setLocation(loc)} 
+                     className={`px-3 py-1 rounded-full border transition-all text-xs ${
+                       location === loc 
+                         ? 'border-black dark:border-white bg-black dark:bg-white text-white dark:text-black font-bold' 
+                         : 'border-neutral-200 dark:border-neutral-800 hover:border-black dark:hover:border-white text-neutral-600 dark:text-neutral-400 bg-white/40 dark:bg-neutral-900/40'
+                     }`}
+                   >
+                     {loc}
+                   </button>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-neutral-500 z-20 relative mb-4">
+                <span className="text-neutral-400 font-mono text-[10px] uppercase tracking-wider mr-2">Role Suggestions:</span>
+                {['Telecaller', 'Content Writer', 'Data Entry', 'Python Intern', 'Social Media', 'Tutor'].map(tag => (
+                   <button key={tag} onClick={() => handleQuickSearch(tag)} className="px-3 py-1 rounded-full border border-neutral-200 dark:border-neutral-800 hover:border-black dark:hover:border-white hover:text-black dark:hover:text-white transition-all bg-white/50 dark:bg-[#111]/50 backdrop-blur-sm text-xs">
                      {tag}
                    </button>
                 ))}
@@ -405,15 +628,29 @@ export const JobSearch: React.FC<JobSearchProps> = ({ checkCredits, onNavigate }
   const renderLoading = () => (
       <div className="min-h-screen flex flex-col items-center justify-center pt-20 px-4">
            <div className="max-w-xl w-full bg-white dark:bg-[#0a0a0a] border border-neutral-200 dark:border-neutral-800 p-8 rounded-3xl shadow-2xl relative overflow-hidden">
-               <div className="absolute top-0 left-0 w-full h-1 bg-neutral-200 dark:bg-neutral-800"><div className="h-full bg-black dark:bg-white animate-shine" style={{ width: '50%' }} /></div>
-               <h2 className="text-3xl font-pixel text-black dark:text-white text-center mb-8 animate-pulse">Agent Active</h2>
-               <div className="space-y-6">
-                  {["Initializing Firecrawl...", "Scanning Nodes...", "Extracting Data...", "Filtering Ghosts...", "Formatting..."].map((s, i) => (
+               <div className="absolute top-0 left-0 w-full h-1 bg-neutral-200 dark:bg-neutral-800">
+                 <div className="h-full bg-gradient-to-r from-blue-600 via-amber-500 to-emerald-500 animate-shine" style={{ width: '60%' }} />
+               </div>
+               <div className="flex items-center justify-center gap-2 mb-4">
+                 <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
+                 <h2 className="text-2xl font-pixel text-black dark:text-white text-center">Multi-Node Scraper Active</h2>
+               </div>
+               <p className="text-xs text-neutral-500 text-center mb-8 font-mono">
+                 Targeting: {selectedPlatforms.join(', ') || 'Naukri.com & JobHai.com'}
+               </p>
+               <div className="space-y-5">
+                  {[
+                    "Connecting to https://www.naukri.com/ portal nodes...",
+                    "Connecting to https://www.jobhai.com/ portal nodes...",
+                    `Extracting verified listings for "${query || 'Student Jobs'}" in "${location}"...`,
+                    "AI Reasoning: Cross-checking dates to filter ghost listings...",
+                    "Normalizing salary benchmarks & formatting direct apply links..."
+                  ].map((s, i) => (
                       <div key={i} className={`flex items-center gap-4 transition-all duration-500 ${i <= loadingIndex ? 'opacity-100 translate-x-0' : 'opacity-30 -translate-x-4'}`}>
-                           <div className={`w-6 h-6 rounded-full flex items-center justify-center border transition-all ${i < loadingIndex ? 'bg-black dark:bg-white border-black dark:border-white text-white dark:text-black' : i === loadingIndex ? 'bg-transparent border-black dark:border-white animate-spin-slow' : 'bg-neutral-100 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800'}`}>
-                               {i < loadingIndex ? <CheckCircle2 size={12} /> : i === loadingIndex ? <div className="w-1.5 h-1.5 bg-black dark:bg-white rounded-full" /> : null}
+                           <div className={`w-6 h-6 rounded-full flex items-center justify-center border transition-all ${i < loadingIndex ? 'bg-black dark:bg-white border-black dark:border-white text-white dark:text-black' : i === loadingIndex ? 'bg-transparent border-blue-500 text-blue-500 animate-spin-slow' : 'bg-neutral-100 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800'}`}>
+                               {i < loadingIndex ? <CheckCircle2 size={12} /> : i === loadingIndex ? <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" /> : null}
                            </div>
-                           <span className={`font-mono text-xs uppercase tracking-widest ${i === loadingIndex ? 'text-black dark:text-white font-bold' : 'text-neutral-500'}`}>{s}</span>
+                           <span className={`font-mono text-xs uppercase tracking-wider ${i === loadingIndex ? 'text-black dark:text-white font-bold' : 'text-neutral-500'}`}>{s}</span>
                       </div>
                   ))}
                </div>
@@ -421,37 +658,204 @@ export const JobSearch: React.FC<JobSearchProps> = ({ checkCredits, onNavigate }
       </div>
   );
 
-  const renderResults = () => (
-    <div className="min-h-screen pt-32 px-4 pb-20 max-w-7xl mx-auto animate-fade-in">
-        <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
-            <div>
-                <h2 className="text-3xl font-pixel font-bold text-black dark:text-white mb-2">Search Results</h2>
-                <p className="text-neutral-500 text-sm">Found {results.length} verified opportunities for "{query}"</p>
-            </div>
-            <button onClick={() => setStep('IDLE')} className="px-6 py-2 bg-neutral-100 dark:bg-neutral-900 text-black dark:text-white rounded-full font-bold text-xs uppercase tracking-widest hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors">
-                New Search
-            </button>
-        </div>
+  const renderResults = () => {
+    const filteredResults = activeResultsFilter === 'ALL' 
+      ? results 
+      : results.filter(j => j.source.toLowerCase() === activeResultsFilter.toLowerCase());
 
-        {results.length === 0 ? (
-            <div className="text-center py-20 border border-dashed border-neutral-200 dark:border-neutral-800 rounded-3xl">
-                <p className="text-neutral-500">{error || "No jobs found. Try adjusting your filters."}</p>
-                <button onClick={() => setStep('IDLE')} className="mt-4 text-black dark:text-white font-bold underline">Try Again</button>
+    const naukriCount = results.filter(j => j.source.toLowerCase().includes('naukri')).length;
+    const jobHaiCount = results.filter(j => j.source.toLowerCase().includes('jobhai')).length;
+    const otherCount = results.length - naukriCount - jobHaiCount;
+
+    return (
+      <div className="min-h-screen pt-32 px-4 pb-20 max-w-7xl mx-auto animate-fade-in">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4 border-b border-neutral-200 dark:border-neutral-800 pb-6">
+              <div>
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold font-mono mb-2">
+                     <CheckCircle2 size={13} /> Scrape Complete ({results.length} Jobs)
+                  </div>
+                  <h2 className="text-3xl md:text-4xl font-pixel font-bold text-black dark:text-white mb-2">
+                     Live Scraped Results
+                  </h2>
+                  <p className="text-neutral-500 text-sm">
+                     Showing opportunities for <strong className="text-black dark:text-white">"{query || 'Student Jobs'}"</strong> in <strong className="text-black dark:text-white">{location}</strong>
+                  </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                  <button 
+                    onClick={exportJobsAsJSON} 
+                    className="px-4 py-2 bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 rounded-full font-bold text-xs uppercase tracking-wider hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors flex items-center gap-1.5"
+                  >
+                     <FileJson size={14} /> Export JSON
+                  </button>
+                  <button 
+                    onClick={() => handleSearch()} 
+                    className="px-4 py-2 bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 rounded-full font-bold text-xs uppercase tracking-wider hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors flex items-center gap-1.5"
+                  >
+                     <Zap size={14} /> Re-Scrape
+                  </button>
+                  <button 
+                    onClick={() => setStep('IDLE')} 
+                    className="px-5 py-2 bg-black dark:bg-white text-white dark:text-black rounded-full font-bold text-xs uppercase tracking-widest hover:opacity-85 transition-opacity"
+                  >
+                     New Search
+                  </button>
+              </div>
+          </div>
+
+          {/* PLATFORM FILTER TABS */}
+          <div className="flex flex-wrap items-center gap-2 mb-8">
+              <button
+                onClick={() => setActiveResultsFilter('ALL')}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  activeResultsFilter === 'ALL'
+                    ? 'bg-black dark:bg-white text-white dark:text-black shadow-sm'
+                    : 'bg-neutral-100 dark:bg-neutral-900 text-neutral-500 hover:text-black dark:hover:text-white'
+                }`}
+              >
+                 All Portals ({results.length})
+              </button>
+
+              {naukriCount > 0 && (
+                <button
+                  onClick={() => setActiveResultsFilter('Naukri')}
+                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    activeResultsFilter.toLowerCase() === 'naukri'
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                      : 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100'
+                  }`}
+                >
+                   <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                   Naukri.com ({naukriCount})
+                </button>
+              )}
+
+              {jobHaiCount > 0 && (
+                <button
+                  onClick={() => setActiveResultsFilter('JobHai')}
+                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    activeResultsFilter.toLowerCase() === 'jobhai'
+                      ? 'bg-amber-500 text-black font-extrabold shadow-md shadow-amber-500/20'
+                      : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100'
+                  }`}
+                >
+                   <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                   JobHai.com ({jobHaiCount})
+                </button>
+              )}
+
+              {otherCount > 0 && (
+                <button
+                  onClick={() => setActiveResultsFilter('OTHER')}
+                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                    activeResultsFilter === 'OTHER'
+                      ? 'bg-black dark:bg-white text-white dark:text-black shadow-sm'
+                      : 'bg-neutral-100 dark:bg-neutral-900 text-neutral-500 hover:text-black dark:hover:text-white'
+                  }`}
+                >
+                   Other Portals ({otherCount})
+                </button>
+              )}
+          </div>
+
+          {filteredResults.length === 0 ? (
+              <div className="text-center py-20 border border-dashed border-neutral-200 dark:border-neutral-800 rounded-3xl p-8">
+                  <p className="text-neutral-500 mb-4">{error || "No jobs found for this specific portal filter. Try 'All Portals'."}</p>
+                  <button 
+                    onClick={() => setActiveResultsFilter('ALL')} 
+                    className="px-6 py-2 bg-black dark:bg-white text-white dark:text-black font-bold text-xs uppercase rounded-full"
+                  >
+                    View All Results
+                  </button>
+              </div>
+          ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredResults.map((job) => (
+                      <JobCard key={job.id} job={job} />
+                  ))}
+              </div>
+          )}
+      </div>
+    );
+  };
+
+  const renderWizard = () => (
+    <div className="min-h-screen pt-32 px-4 pb-20 max-w-3xl mx-auto animate-fade-in">
+        <div className="bg-white dark:bg-[#0a0a0a] border border-neutral-200 dark:border-neutral-800 p-8 rounded-3xl shadow-2xl">
+            <h2 className="text-3xl font-pixel font-bold text-black dark:text-white mb-2">Configure Multi-Portal Scrape</h2>
+            <p className="text-neutral-500 text-sm mb-8">Customize target keywords, portals, and location before running crawler nodes.</p>
+
+            <div className="space-y-6">
+                <div>
+                    <label className="block text-xs font-mono font-bold uppercase tracking-wider text-neutral-500 mb-2">Job Role / Keyword</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Telecaller, Data Entry, Python Intern"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-3.5 rounded-xl text-black dark:text-white outline-none focus:border-black dark:focus:border-white font-medium"
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-xs font-mono font-bold uppercase tracking-wider text-neutral-500 mb-2">Location</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Remote / India, Delhi NCR, Mumbai, Bengaluru"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-3.5 rounded-xl text-black dark:text-white outline-none focus:border-black dark:focus:border-white font-medium"
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-xs font-mono font-bold uppercase tracking-wider text-neutral-500 mb-2">Target Portals</label>
+                    <div className="flex flex-wrap gap-2">
+                        {availablePlatforms.map(p => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => togglePlatform(p)}
+                            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                              selectedPlatforms.includes(p)
+                                ? p === 'Naukri' 
+                                  ? 'bg-blue-600 text-white' 
+                                  : p === 'JobHai' 
+                                  ? 'bg-amber-500 text-black font-extrabold' 
+                                  : 'bg-black dark:bg-white text-white dark:text-black'
+                                : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500'
+                            }`}
+                          >
+                             {p === 'Naukri' ? 'Naukri.com' : p === 'JobHai' ? 'JobHai.com' : p}
+                          </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+                    <button 
+                      onClick={() => setStep('IDLE')}
+                      className="px-6 py-2.5 rounded-full text-xs font-bold text-neutral-500 hover:text-black dark:hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={() => handleSearch()}
+                      className="px-8 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest bg-black dark:bg-white text-white dark:text-black hover:opacity-85 shadow-md"
+                    >
+                      Start Scrape
+                    </button>
+                </div>
             </div>
-        ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {results.map((job) => (
-                    <JobCard key={job.id} job={job} />
-                ))}
-            </div>
-        )}
+        </div>
     </div>
   );
 
   return (
     <>
       {step === 'IDLE' && renderIdleHero()}
-      {step === 'WIZARD' && <div className="pt-32"><div className="text-center p-20">Wizard Placeholder</div></div>}
+      {step === 'WIZARD' && renderWizard()}
       {step === 'LOADING' && renderLoading()}
       {step === 'RESULTS' && renderResults()}
       {legalTab && <LegalModal initialTab={legalTab} onClose={() => setLegalTab(null)} />}

@@ -121,37 +121,50 @@ export const JobCard: React.FC<JobCardProps> = ({ job: initialJob }) => {
       </div>
       
       <div className="flex flex-wrap gap-2 mb-4 relative z-10">
-        <span className="flex items-center gap-1.5 bg-neutral-900 border border-neutral-800 px-3 py-1.5 rounded-md text-[10px] text-neutral-300 font-mono uppercase">
+        <span className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 px-3 py-1.5 rounded-md text-[10px] text-neutral-700 dark:text-neutral-300 font-mono uppercase">
           <MapPin size={10} /> {job.location}
         </span>
-        <span className="flex items-center gap-1.5 bg-neutral-900 border border-neutral-800 px-3 py-1.5 rounded-md text-[10px] text-neutral-300 font-mono uppercase">
-           {job.platforms && job.platforms.length > 1 ? (
-               <><Layers size={10} /> {job.source} +{job.platforms.length - 1}</>
-           ) : (
-               <><Globe size={10} /> {job.source}</>
-           )}
-        </span>
+        
+        {/* PLATFORM BADGE WITH NAUKRI & JOBHAI HIGHLIGHTS */}
+        {job.source === 'Naukri' ? (
+           <span className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide">
+             <span className="w-2 h-2 rounded-full bg-blue-500"></span> Naukri.com
+           </span>
+        ) : job.source === 'JobHai' ? (
+           <span className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide">
+             <span className="w-2 h-2 rounded-full bg-amber-500"></span> JobHai.com
+           </span>
+        ) : job.source === 'Internshala' ? (
+           <span className="flex items-center gap-1.5 bg-cyan-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide">
+             <span className="w-2 h-2 rounded-full bg-cyan-500"></span> Internshala
+           </span>
+        ) : (
+           <span className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 px-3 py-1.5 rounded-md text-[10px] text-neutral-700 dark:text-neutral-300 font-mono uppercase">
+              <Globe size={10} /> {job.source || 'Web'}
+           </span>
+        )}
+
         {job.salary && (
-           <span className="flex items-center gap-1.5 bg-white text-black border border-transparent px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide">
+           <span className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide">
              {job.salary}
            </span>
         )}
       </div>
 
-      <p className="text-sm text-neutral-400 leading-relaxed mb-6 font-light flex-grow relative z-10">
+      <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed mb-6 font-light flex-grow relative z-10">
         {job.description}
       </p>
 
       {/* Advanced Features Toolbar */}
-      <div className="flex gap-2 mb-6 border-t border-neutral-800 pt-4 overflow-x-auto pb-2 custom-scrollbar relative z-10">
-          <button onClick={handleCompanyDNA} className="flex items-center gap-1 text-[10px] text-neutral-500 hover:text-white bg-neutral-900/50 px-3 py-2 rounded-lg whitespace-nowrap transition-colors">
+      <div className="flex gap-2 mb-6 border-t border-neutral-200 dark:border-neutral-800 pt-4 overflow-x-auto pb-2 custom-scrollbar relative z-10">
+          <button onClick={handleCompanyDNA} className="flex items-center gap-1 text-[10px] text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white bg-neutral-100 dark:bg-neutral-900/50 px-3 py-2 rounded-lg whitespace-nowrap transition-colors border border-neutral-200 dark:border-transparent">
               <Activity size={12} /> {loadingDna ? 'Scanning...' : 'Company DNA'}
           </button>
-          <button onClick={handleNegotiation} className="flex items-center gap-1 text-[10px] text-neutral-500 hover:text-white bg-neutral-900/50 px-3 py-2 rounded-lg whitespace-nowrap transition-colors">
+          <button onClick={handleNegotiation} className="flex items-center gap-1 text-[10px] text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white bg-neutral-100 dark:bg-neutral-900/50 px-3 py-2 rounded-lg whitespace-nowrap transition-colors border border-neutral-200 dark:border-transparent">
               <DollarSign size={12} /> Salary Script
           </button>
           {job.recruiterEmail && (
-              <a href={`mailto:${job.recruiterEmail}`} className="flex items-center gap-1 text-[10px] text-neutral-500 hover:text-white bg-neutral-900/50 px-3 py-2 rounded-lg whitespace-nowrap transition-colors">
+              <a href={`mailto:${job.recruiterEmail}`} className="flex items-center gap-1 text-[10px] text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white bg-neutral-100 dark:bg-neutral-900/50 px-3 py-2 rounded-lg whitespace-nowrap transition-colors border border-neutral-200 dark:border-transparent">
                   <Mail size={12} /> Email HR
               </a>
           )}
@@ -159,28 +172,28 @@ export const JobCard: React.FC<JobCardProps> = ({ job: initialJob }) => {
 
       {/* DNA Result Area */}
       {dnaAnalysis && (
-          <div className="mb-4 bg-neutral-900/30 p-4 rounded-lg border-l-2 border-purple-500 text-xs text-neutral-300 space-y-2 relative z-10">
+          <div className="mb-4 bg-neutral-100 dark:bg-neutral-900/40 p-4 rounded-lg border-l-2 border-purple-500 text-xs text-neutral-800 dark:text-neutral-300 space-y-2 relative z-10">
               <div className="flex justify-between">
-                  <span className="font-bold text-white">Stability:</span>
+                  <span className="font-bold text-black dark:text-white">Stability:</span>
                   <span>{dnaAnalysis.stability}</span>
               </div>
               <div className="flex justify-between">
-                  <span className="font-bold text-white">Sentiment:</span>
+                  <span className="font-bold text-black dark:text-white">Sentiment:</span>
                   <span>{dnaAnalysis.employeeSentiment}</span>
               </div>
               <div className="flex justify-between">
-                  <span className="font-bold text-white">Hiring:</span>
-                  <span className="text-green-400">{dnaAnalysis.hiringTrend}</span>
+                  <span className="font-bold text-black dark:text-white">Hiring:</span>
+                  <span className="text-green-600 dark:text-green-400">{dnaAnalysis.hiringTrend}</span>
               </div>
           </div>
       )}
       
       {/* Negotiation Result Area */}
       {negotiationScript && (
-          <div className="mb-4 bg-neutral-900/30 p-4 rounded-lg border-l-2 border-green-500 text-xs text-neutral-300 leading-relaxed font-mono relative z-10">
+          <div className="mb-4 bg-neutral-100 dark:bg-neutral-900/40 p-4 rounded-lg border-l-2 border-green-500 text-xs text-neutral-800 dark:text-neutral-300 leading-relaxed font-mono relative z-10">
               <div className="flex justify-between items-center mb-2">
-                  <span className="font-bold text-green-400 uppercase">Negotiation Script</span>
-                  <button onClick={() => navigator.clipboard.writeText(negotiationScript)} className="text-[10px] hover:text-white">Copy</button>
+                  <span className="font-bold text-green-600 dark:text-green-400 uppercase">Negotiation Script</span>
+                  <button onClick={() => navigator.clipboard.writeText(negotiationScript)} className="text-[10px] text-neutral-500 hover:text-black dark:hover:text-white">Copy</button>
               </div>
               {negotiationScript}
           </div>
@@ -189,7 +202,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job: initialJob }) => {
       <div className="mt-auto grid grid-cols-2 gap-3 relative z-10">
           <button 
             onClick={handleGhostFill}
-            className="bg-neutral-900 hover:bg-neutral-800 text-white border border-neutral-800 py-3 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-none"
+            className="bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white border border-neutral-200 dark:border-neutral-800 py-3 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-none"
           >
              <Ghost size={14} /> Ghost Mode
           </button>
@@ -198,9 +211,15 @@ export const JobCard: React.FC<JobCardProps> = ({ job: initialJob }) => {
             href={job.url} 
             target="_blank" 
             rel="noopener noreferrer"
-            className="bg-white text-black hover:bg-neutral-200 border-transparent py-3 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-sm"
+            className={`${
+                job.source === 'Naukri' 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                : job.source === 'JobHai'
+                ? 'bg-amber-500 hover:bg-amber-600 text-black font-extrabold'
+                : 'bg-black dark:bg-white text-white dark:text-black hover:opacity-90'
+            } py-3 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-sm`}
           >
-            {job.isVerified ? 'Apply Now' : 'Find Apply Link'} <ExternalLink size={14} />
+            {job.source === 'Naukri' ? 'Apply on Naukri' : job.source === 'JobHai' ? 'Apply on JobHai' : 'Apply Now'} <ExternalLink size={14} />
           </a>
       </div>
     </div>

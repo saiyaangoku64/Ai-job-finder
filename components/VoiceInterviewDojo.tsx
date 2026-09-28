@@ -254,7 +254,7 @@ const useDojoSession = () => {
             updateVolume();
             
             const sessionPromise = ai.live.connect({
-                model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+                model: 'gemini-3.8-live',
                 config: {
                     responseModalities: [Modality.AUDIO],
                     speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Fenrir' } } },
@@ -269,7 +269,7 @@ const useDojoSession = () => {
                         setInitializing(false);
                         playConnectSound(ctx);
                         if(introMessage) {
-                             sessionPromise.then(s => s.sendRealtimeInput([{ mimeType: "text/plain", data: introMessage }]));
+                             sessionPromise.then(s => s.sendClientContent({ turns: [{ role: "user", parts: [{ text: introMessage }] }] }));
                         }
                     },
                     onmessage: (msg: LiveServerMessage) => {
